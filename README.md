@@ -24,8 +24,9 @@ ESP32-audioI2S Versão 3.0.13 : https://github.com/schreibfaul1/ESP32-audioI2S
 
 Aurelio
 
+<img width="3768" height="2169" alt="IMG_20260508_171146" src="https://github.com/user-attachments/assets/f7830b1f-385d-4ce9-9125-a81d26a4a661" />
 
-![image](https://github.com/cyberwisk/M5Cardputer_WebRadio/assets/3136312/9bd48f53-334c-43c1-8226-1ece040430c5)
+
 ----
 Wifi:
 
