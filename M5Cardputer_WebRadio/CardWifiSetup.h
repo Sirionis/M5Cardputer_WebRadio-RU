@@ -2,9 +2,9 @@
  * @file CardWifiSetup.h
  * @author Aurélio Avanzi (Cyberwisk)
  * @brief https://github.com/cyberwisk/M5Card_Wifi_KeyBoard_Setup
- * @version Beta 1.1
+ * @version Beta 1.2
  * @date 2024-02-18
- * @modificado 1015-05-25
+ * @modificado 2026-05-08
  *
  * @Hardwares: M5Cardputer - https://docs.m5stack.com/en/core/Cardputer
  * @Dependent Librarys:
@@ -12,7 +12,6 @@
  * WiFi: https://github.com/espressif/arduino-esp32
  ******************** POR FAVOR MANTENHA OS CREDITOS *************************
  * */
-
 #include <WiFi.h>
 #include <Preferences.h>
 #include <esp_wifi.h>
@@ -212,6 +211,7 @@ void connectToWiFi() {
         
         unsigned long startTime = millis();
         M5Cardputer.Display.print("Conectando");
+        M5Cardputer.Display.drawString("BtnA apaga rede salva", 2, 100);
         
         while (millis() - startTime < WIFI_TIMEOUT) {
             M5Cardputer.update();
@@ -235,6 +235,7 @@ void connectToWiFi() {
             
             M5Cardputer.Display.print(".");
             delay(50);
+
         }
     }
     
@@ -266,4 +267,6 @@ void connectToWiFi() {
     WiFi.begin(CFG_WIFI_SSID.c_str(), CFG_WIFI_PASS.c_str());
     delay(300);
     displayWiFiInfo();
+    delay(300);
+    //ESP.restart();
 }
