@@ -17,6 +17,7 @@
 //Display: Tela TFT de 1.14 polegadas com resolução de 135x240 pixels.
 #include "M5Cardputer.h"
 #include "CardWifiSetup.h"
+#include "glass2.h"
 #include <Audio.h> //ESP32-audioI2S vesão 
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel led(1, 21, NEO_GRB + NEO_KHZ800);
@@ -78,6 +79,7 @@ static int16_t raw_data[WAVE_SIZE * 2];
 static uint32_t bgcolor(int y) {
   auto h = M5Cardputer.Display.height();
   auto dh = h - header_height;
+  if (dh <= 0) return 0;
   int v = ((h - y) << 5) / dh;
   if (dh > header_height) {
     int v2 = ((h - y - 1) << 5) / dh;
@@ -275,6 +277,7 @@ void showStation() {
   fftSimON = false;
   M5Cardputer.Display.fillRect(0, 15, 240, 35, TFT_BLACK);
   M5Cardputer.Display.drawString(stations[curStation].name, 0, 15);
+  glass2Show(stations[curStation].name);
   showVolume();
 }
 
@@ -387,6 +390,7 @@ void setup() {
   //M5Cardputer.Speaker.setVolume(255);
   
   M5Cardputer.begin(cfg, true);
+  glass2Init();
 
   led.begin();
   led.setBrightness(255);  // Brilho (0-255)
@@ -449,9 +453,6 @@ void loop() {
     else if (M5Cardputer.Keyboard.isKeyPressed('f')) {
       toggleFFT();  //tecla 'f' para ativar/desativar FFT
     }
-      else if (M5Cardputer.Keyboard.isKeyPressed('f')) {
-      toggleFFT();  //tecla 'f' para ativar/desativar FFT
-    }
     
     lastButtonPress = millis();
       //char key = M5Cardputer.Keyboard.read();  // Lê a tecla pressionada
@@ -477,13 +478,14 @@ void loop() {
 //}
 
 void audio_showstation(const char *showstation) {
-    if (showstation && *showstation) { // Verifica se a string não é nula e não está vazia
-        char limitedInfo[241];  // 240 caracteres + 1 para o terminador nulo
-        strncpy(limitedInfo, showstation, 24);  // Copia apenas os primeiros 240 caracteres
-        limitedInfo[24] = '\0';  // Garante que a string termine corretamente
+    if (showstation && *showstation) {
+        char limitedInfo[25];
+        strncpy(limitedInfo, showstation, 24);
+        limitedInfo[24] = '\0';
         M5Cardputer.Display.fillRect(0, 15, 240, 15, TFT_BLACK);
         M5Cardputer.Display.drawString(limitedInfo, 0, 15);
-       fftSimON = true;
+        glass2Show(stations[curStation].name, limitedInfo);
+        fftSimON = true;
     }
 }
 
