@@ -143,6 +143,16 @@ void updateFFT() {
   // Executa FFT
   fft.exec(raw_data);
 
+  // Glass2 spectrum: 32 bars from first 128 FFT bins, heights mapped 0-48px
+  {
+    uint8_t bars[32];
+    for (uint8_t i = 0; i < 32; i++) {
+      uint32_t val = fft.get(i * 4);
+      bars[i] = (uint8_t)((val * 48) >> 15); // 32768 → 48px max
+    }
+    glass2Spectrum(stations[curStation].name, bars, 32);
+  }
+
   // Parâmetros para desenho
   size_t bw = M5Cardputer.Display.width() / 30;
   if (bw < 3) bw = 3;
