@@ -1,2 +1,8 @@
+# сборка PlatformIO
 .pio/
 .vscode/
+build.log
+dist/
+
+# прошивки собираются в CI и раздаются через Releases, в git их не держим
+*.bin

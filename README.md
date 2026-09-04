@@ -1,5 +1,7 @@
 # M5Cardputer WebRadio — RU edition
 
+[![build](https://github.com/Sirionis/M5Cardputer_WebRadio-RU/actions/workflows/build.yml/badge.svg)](https://github.com/Sirionis/M5Cardputer_WebRadio-RU/actions/workflows/build.yml)
+
 Интернет-радио для [M5Cardputer](https://docs.m5stack.com/en/core/Cardputer):
 19 российских станций зашиты в прошивку, SD-карта не нужна, интерфейс и
 названия станций — на русском.
@@ -20,10 +22,19 @@
 
 ## Прошивка
 
+Готовые образы лежат на странице
+[Releases](https://github.com/Sirionis/M5Cardputer_WebRadio-RU/releases) — их
+собирает GitHub Actions из исходников этого репозитория, рядом с файлами лежат
+`SHA256SUMS` и ссылка на конкретный прогон сборки. В git прошивки не хранятся.
+
+| Файл | Куда писать |
+|------|-------------|
+| `WebRadio_RU.bin` | образ приложения: лоадер или `esptool` по адресу `0x10000` |
+| `WebRadio_RU_full.bin` | полный образ 4 МБ: `esptool` по адресу `0x0` |
+
 ### Через лоадер (M5Launcher и подобные)
 
-Взять `WebRadio_RU.bin` (1.3 МБ) — это чистый образ приложения. Скопировать на
-SD-карту и выбрать в меню лоадера.
+Скопировать `WebRadio_RU.bin` на SD-карту и выбрать в меню лоадера.
 
 ### Через esptool
 
@@ -34,10 +45,13 @@ SD-карту и выбрать в меню лоадера.
 esptool.py --chip esp32s3 --port /dev/ttyACM0 --baud 1500000 write_flash 0x10000 WebRadio_RU.bin
 ```
 
-Если нужен полный образ на 4 МБ для записи с нуля (bootloader + таблица
-разделов + boot_app0 + приложение), он собирается скриптом
-`./tools/make_release_bin.sh` и пишется с `0x0`. Такой образ обнуляет NVS —
-Wi-Fi придётся ввести заново.
+Полный образ `WebRadio_RU_full.bin` (bootloader + таблица разделов + boot_app0 +
+приложение) пишется с `0x0` и нужен, если устройство прошивается с нуля. Он
+обнуляет NVS — Wi-Fi придётся ввести заново:
+
+```bash
+esptool.py --chip esp32s3 --port /dev/ttyACM0 --baud 1500000 write_flash 0x0 WebRadio_RU_full.bin
+```
 
 ## Первый запуск
 
@@ -164,6 +178,26 @@ pio run -e cardputer -t upload
 ```
 
 Занято: около 1.36 МБ флеша из 3 МБ и 18% RAM.
+
+Версии платформы и библиотек в `platformio.ini` зафиксированы точными номерами,
+а не диапазонами: релизный бинарник должен собираться одинаково и сегодня, и
+через год.
+
+### Сборка в CI
+
+[`.github/workflows/build.yml`](.github/workflows/build.yml) собирает прошивку
+на каждый push и pull request и складывает результат в артефакты прогона.
+По тегу `v*` тот же workflow выпускает Release: в него попадают образ
+приложения, полный образ на 4 МБ, `bootloader.bin`, `partitions.bin` и
+`SHA256SUMS`, а в описании — коммит, ссылка на прогон сборки, версии тулчейна
+и занятая память.
+
+Выпустить новую версию:
+
+```bash
+git tag -a v1.0.0 -m "v1.0.0"
+git push origin v1.0.0
+```
 
 ### Сборка в Arduino IDE
 

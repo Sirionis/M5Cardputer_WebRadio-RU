@@ -1,0 +1,110 @@
+name: build
+
+# Прошивки в git не лежат: каждая сборка идёт из исходников этого репозитория,
+# CI кладёт результат в артефакты, а по тегу v* — ещё и в Release.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Кэш PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
+
+      - name: Установить PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Собрать прошивку
+        run: |
+          set -o pipefail
+          pio run -e cardputer 2>&1 | tee build.log
+
+      - name: Собрать полный образ на 4 МБ
+        run: |
+          mkdir -p dist
+          ./tools/make_release_bin.sh dist/WebRadio_RU_full.bin
+
+      - name: Разложить артефакты и посчитать контрольные суммы
+        run: |
+          cp .pio/build/cardputer/firmware.bin   dist/WebRadio_RU.bin
+          cp .pio/build/cardputer/bootloader.bin dist/bootloader.bin
+          cp .pio/build/cardputer/partitions.bin dist/partitions.bin
+          (cd dist && sha256sum *.bin > SHA256SUMS && cat SHA256SUMS)
+
+      - name: Собрать описание релиза
+        run: |
+          version="${GITHUB_REF_NAME}"
+          sizes=$(grep -E '^(RAM|Flash):' build.log || true)
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          {
+            echo "Прошивка собрана в GitHub Actions из исходников этого репозитория."
+            echo
+            echo "* коммит: \`${GITHUB_SHA}\`"
+            echo "* сборка: ${run_url}"
+            echo "* тулчейн: arduino-esp32 2.0.17, ESP32-audioI2S 3.0.12, $(pio --version)"
+            echo
+            echo '```'
+            echo "${sizes}"
+            echo '```'
+            echo
+            echo '## Что качать'
+            echo
+            echo '| Файл | Куда |'
+            echo '|------|------|'
+            echo '| `WebRadio_RU.bin` | лоадер (M5Launcher) или `esptool ... 0x10000` |'
+            echo '| `WebRadio_RU_full.bin` | полный образ 4 МБ, `esptool ... 0x0` (обнуляет NVS: Wi-Fi вводится заново) |'
+            echo
+            echo '## Прошивка'
+            echo
+            echo '```bash'
+            echo 'esptool.py --chip esp32s3 --port /dev/ttyACM0 --baud 1500000 write_flash 0x10000 WebRadio_RU.bin'
+            echo '```'
+            echo
+            echo '## Контрольные суммы'
+            echo
+            echo '```'
+            cat dist/SHA256SUMS
+            echo '```'
+          } > dist/RELEASE_NOTES.md
+          cp dist/RELEASE_NOTES.md dist/BUILDINFO.md
+          cat dist/RELEASE_NOTES.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WebRadio_RU-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+
+      - name: Выпустить релиз
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: WebRadio RU ${{ github.ref_name }}
+          body_path: dist/RELEASE_NOTES.md
+          files: |
+            dist/WebRadio_RU.bin
+            dist/WebRadio_RU_full.bin
+            dist/bootloader.bin
+            dist/partitions.bin
+            dist/SHA256SUMS
+          fail_on_unmatched_files: true
