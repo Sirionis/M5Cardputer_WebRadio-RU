@@ -195,9 +195,13 @@ pio run -e cardputer -t upload
 Выпустить новую версию:
 
 ```bash
-git tag -a v1.0.0 -m "v1.0.0"
-git push origin v1.0.0
+git tag -a v1.0.1 -m "v1.0.1" && git push origin v1.0.1
 ```
+
+Шаг релиза не просто вызывает API, а перечитывает результат: если релиз остался
+черновиком или файлы не приложились, сборка падает. Для создания релиза нужны
+права на запись у токена — Settings → Actions → General → Workflow permissions →
+«Read and write permissions».
 
 ### Сборка в Arduino IDE
 

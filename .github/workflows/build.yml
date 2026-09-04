@@ -96,14 +96,41 @@ jobs:
 
       - name: Выпустить релиз
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          name: WebRadio RU ${{ github.ref_name }}
-          body_path: dist/RELEASE_NOTES.md
-          files: |
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          files=(
             dist/WebRadio_RU.bin
             dist/WebRadio_RU_full.bin
             dist/bootloader.bin
             dist/partitions.bin
             dist/SHA256SUMS
-          fail_on_unmatched_files: true
+          )
+
+          # Релиз мог остаться черновиком от прошлого прогона - тогда дополняем
+          # его и публикуем, а не пытаемся создать второй с тем же тегом.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Релиз $tag уже есть, обновляю"
+            gh release upload "$tag" "${files[@]}" --clobber
+            gh release edit "$tag" \
+              --draft=false \
+              --title "WebRadio RU $tag" \
+              --notes-file dist/RELEASE_NOTES.md
+          else
+            gh release create "$tag" "${files[@]}" \
+              --title "WebRadio RU $tag" \
+              --notes-file dist/RELEASE_NOTES.md
+          fi
+
+          # Проверяем, что релиз действительно опубликован и файлы на месте:
+          # шаг не должен зеленеть, если по факту ничего не выложено.
+          gh release view "$tag" --json url,isDraft,assets \
+            --jq '"релиз:  \(.url)\nчерновик: \(.isDraft)\nфайлов:  \(.assets | length)"'
+          count=$(gh release view "$tag" --json assets --jq '.assets | length')
+          draft=$(gh release view "$tag" --json isDraft --jq '.isDraft')
+          if [ "$draft" != "false" ] || [ "$count" -lt 5 ]; then
+            echo "::error::релиз не опубликован или файлы не приложены" >&2
+            exit 1
+          fi
