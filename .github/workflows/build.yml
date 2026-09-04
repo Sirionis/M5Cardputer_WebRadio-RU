@@ -86,7 +86,6 @@ jobs:
             cat dist/SHA256SUMS
             echo '```'
           } > dist/RELEASE_NOTES.md
-          cp dist/RELEASE_NOTES.md dist/BUILDINFO.md
           cat dist/RELEASE_NOTES.md
 
       - uses: actions/upload-artifact@v4
