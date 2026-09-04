@@ -1,11 +1,19 @@
-Radio Porao,https://server03.stmsg.com.br:6678/stream
-Morcegao FM,https://radio.morcegaofm.com.br/morcegao32
-MundoLivre FM,https://up-rcr.webnow.com.br/mundolivre.mp3
-GTA Classics,https://gta-classics.stream.laut.fm/gta-classics
-u80s,https://ice6.somafm.com/u80s-128-mp3
-Metal Detector,https://ice4.somafm.com/metal-128-mp3
-181-beatles_128k,https://listen.181fm.com/181-beatles_128k.mp3
-89Rock,https://21933.live.streamtheworld.com/RADIO_89FM_ADP.aac
-Morcegao FM,https://radio.morcegaofm.com.br/morcegao128
-Morcegao FM Auto,https://radio.morcegaofm.com.br/auto
-Los Santos Rock,/mp3/Los Santos Rock Radio.mp3
+Радио ULTRA,http://nashe1.hostingradio.ru/ultra-128.mp3
+НАШЕ Радио,http://nashe1.hostingradio.ru/nashe-128.mp3
+НАШЕ Классик Рок,http://nashe1.hostingradio.ru/nasheclassic.mp3
+НАШЕ Панки,http://nashe1.hostingradio.ru/nashepunks.mp3
+ROCK FM,http://nashe1.hostingradio.ru/rock-128.mp3
+Радио ENERGY,http://gpm.hostingradio.ru/gpm-energyfm495.aacp
+Авторадио,http://gpm.hostingradio.ru/gpm-avtoradio495.aacp
+Европа Плюс,http://ep128.hostingradio.ru:8030/ep128
+Радио MAXIMUM,http://maximum.hostingradio.ru/maximum96.aacp
+Русское Радио,http://rusradio.hostingradio.ru/rusradio96.aacp
+DFM,http://dfm.hostingradio.ru/dfm96.aacp
+Радио RECORD,http://radiorecord.hostingradio.ru/rr_main96.aacp
+RECORD Русский Микс,http://radiorecord.hostingradio.ru/rus96.aacp
+Дорожное радио,http://dorognoe.hostingradio.ru:8000/dorognoe
+Радио JAZZ,http://nashe1.hostingradio.ru/jazz-128.mp3
+BEST FM,http://nashe1.hostingradio.ru/best-128.mp3
+Юмор FM,http://gpm.hostingradio.ru/gpm-humorfm495.aacp
+Comedy Radio,http://gpm.hostingradio.ru/gpm-comedyradio495.aacp
+Радио МАЯК,http://icecast.vgtrk.cdnvideo.ru/mayakfm_mp3_128kbps

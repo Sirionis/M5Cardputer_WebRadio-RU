@@ -2,7 +2,7 @@
  * @file M5Cardputer_WebRadio.ino
  * @author Aurélio Avanzi
  * @brief https://github.com/cyberwisk/M5Cardputer_WebRadio
- * @version Beta 1.1
+ * @version Beta 1.1 - RU edition (standalone build, russian station list)
  * @date 2023-12-12
  *
  * @Hardwares: M5Cardputer
@@ -17,17 +17,25 @@
 //Display: Tela TFT de 1.14 polegadas com resolução de 135x240 pixels.
 #include "M5Cardputer.h"
 #include "CardWifiSetup.h"
+#include "ru_fonts.h"
 #include "glass2.h"
 #include <Audio.h> //ESP32-audioI2S vesão 
+#include <SPI.h>
+#include <SD.h>
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel led(1, 21, NEO_GRB + NEO_KHZ800);
 
-#define MAX_STATIONS 20
-#define MAX_NAME_LENGTH 30
+#define MAX_STATIONS 24
+#define MAX_NAME_LENGTH 40  // кириллица в UTF-8 - 2 байта на символ
 #define MAX_URL_LENGTH 100
 #define I2S_BCK 41
 #define I2S_WS 43
 #define I2S_DOUT 42
+// Cartao SD do Cardputer (SPI)
+#define SD_SPI_SCK 40
+#define SD_SPI_MISO 39
+#define SD_SPI_MOSI 14
+#define SD_SPI_CS 12
 
 // FFT Constants
 #define FFT_SIZE 256
@@ -95,17 +103,50 @@ struct RadioStation {
   char url[MAX_URL_LENGTH];
 };
 
+// Российские станции - список зашит в прошивку, SD-карта не нужна.
+// Всё по обычному HTTP: меньше RAM/CPU на ESP32-S3, чем HTTPS.
 const PROGMEM RadioStation defaultStations[] = {
-  {"Radio Porao", "https://server03.stmsg.com.br:6678/stream"},
-  {"Morcegao FM", "https://radio.morcegaofm.com.br/morcegao32"},
-  {"Mundo Livre", "https://up-rcr.webnow.com.br/mundolivre.mp3"},
-  {"Radio Mundo do Rock","https://servidor34.brlogic.com:8014/live"},
+  {"Радио ULTRA",         "http://nashe1.hostingradio.ru/ultra-128.mp3"},
+  {"НАШЕ Радио",          "http://nashe1.hostingradio.ru/nashe-128.mp3"},
+  {"НАШЕ Классик Рок",    "http://nashe1.hostingradio.ru/nasheclassic.mp3"},
+  {"НАШЕ Панки",          "http://nashe1.hostingradio.ru/nashepunks.mp3"},
+  {"ROCK FM",             "http://nashe1.hostingradio.ru/rock-128.mp3"},
+  {"Радио ENERGY",        "http://gpm.hostingradio.ru/gpm-energyfm495.aacp"},
+  {"Авторадио",           "http://gpm.hostingradio.ru/gpm-avtoradio495.aacp"},
+  {"Европа Плюс",         "http://ep128.hostingradio.ru:8030/ep128"},
+  {"Радио MAXIMUM",       "http://maximum.hostingradio.ru/maximum96.aacp"},
+  {"Русское Радио",       "http://rusradio.hostingradio.ru/rusradio96.aacp"},
+  {"DFM",                 "http://dfm.hostingradio.ru/dfm96.aacp"},
+  {"Радио RECORD",        "http://radiorecord.hostingradio.ru/rr_main96.aacp"},
+  {"RECORD Русский Микс", "http://radiorecord.hostingradio.ru/rus96.aacp"},
+  {"Дорожное радио",      "http://dorognoe.hostingradio.ru:8000/dorognoe"},
+  {"Радио JAZZ",          "http://nashe1.hostingradio.ru/jazz-128.mp3"},
+  {"BEST FM",             "http://nashe1.hostingradio.ru/best-128.mp3"},
+  {"Юмор FM",             "http://gpm.hostingradio.ru/gpm-humorfm495.aacp"},
+  {"Comedy Radio",        "http://gpm.hostingradio.ru/gpm-comedyradio495.aacp"},
+  {"Радио МАЯК",          "http://icecast.vgtrk.cdnvideo.ru/mayakfm_mp3_128kbps"},
 };
-
 RadioStation stations[MAX_STATIONS];
 size_t numStations = 0;
-size_t curStation = 3; //qual radio iniciar
+size_t curStation = 0; //qual radio iniciar
 uint16_t curVolume = 115;
+
+// Бегущая строка с названием трека
+String streamTitle;
+int titleOffset = 0;
+unsigned long lastTitleScroll = 0;
+
+// Prototipos (o Arduino IDE gera sozinho, o PlatformIO nem sempre)
+void showVolume();
+void drawStreamTitle();
+void updateStreamTitle();
+void showStation();
+void Playfile();
+void loadDefaultStations();
+void mergeRadioStations();
+void setupFFT();
+void updateFFT();
+void toggleFFT();
 
 // Controle de debounce
 unsigned long lastButtonPress = 0;
@@ -224,7 +265,7 @@ void updateBatteryDisplay(unsigned long updateInterval) {
     //M5Cardputer.Display.drawString(percentageStr,215 + 10,5 + 5,&fonts::Font0);
     //M5Cardputer.Display.drawString("Fonte maior", 10, 40, 2);
     // Restaura a fonte original
-    //M5Cardputer.Display.setFont(&fonts::FreeMonoOblique9pt7b);
+    //M5Cardputer.Display.setFont(&fontRU);  // моноширинный 9x15 с кириллицей
   }
 }
 
@@ -233,54 +274,59 @@ void loadDefaultStations() {
   memcpy(stations, defaultStations, sizeof(RadioStation) * numStations);
 }
 
+// O firmware ja traz a lista completa embutida, entao o cartao SD e opcional:
+// se existir /station_list.txt ele substitui a lista, senao seguimos com os
+// defaults sem travar o boot.
 void mergeRadioStations() {
-  if (!SD.begin()) {
-    led.setPixelColor(0, led.Color(255, 0, 0));
+  loadDefaultStations();
+
+  SPI.begin(SD_SPI_SCK, SD_SPI_MISO, SD_SPI_MOSI, SD_SPI_CS);
+  if (!SD.begin(SD_SPI_CS, SPI, 25000000)) {
+    led.setPixelColor(0, led.Color(0, 0, 0));
     led.show();
-    M5Cardputer.Display.drawString("/station_list.txt ", 20, 30);
-    M5Cardputer.Display.drawString("NAO Encontrado no SD", 20, 50);
-    delay(4000);
-    loadDefaultStations();
-    M5Cardputer.Display.fillScreen(BLACK);
     return;
   }
 
   File file = SD.open("/station_list.txt");
   if (!file) {
-    loadDefaultStations();
+    led.setPixelColor(0, led.Color(0, 0, 0));
+    led.show();
     return;
   }
 
-  numStations = 0;
-  
+  size_t loaded = 0;
   String line;
-  while (file.available() && numStations < MAX_STATIONS) {
+  while (file.available() && loaded < MAX_STATIONS) {
     line = file.readStringUntil('\n');
     int commaIndex = line.indexOf(',');
-    
+
     if (commaIndex > 0) {
       String name = line.substring(0, commaIndex);
       String url = line.substring(commaIndex + 1);
-      
+
       name.trim();
       url.trim();
-      
+
       if (name.length() > 0 && url.length() > 0) {
-        strncpy(stations[numStations].name, name.c_str(), MAX_NAME_LENGTH - 1);
-        strncpy(stations[numStations].url, url.c_str(), MAX_URL_LENGTH - 1);
-        stations[numStations].name[MAX_NAME_LENGTH - 1] = '\0';
-        stations[numStations].url[MAX_URL_LENGTH - 1] = '\0';
-        numStations++;
+        strncpy(stations[loaded].name, name.c_str(), MAX_NAME_LENGTH - 1);
+        strncpy(stations[loaded].url, url.c_str(), MAX_URL_LENGTH - 1);
+        stations[loaded].name[MAX_NAME_LENGTH - 1] = '\0';
+        stations[loaded].url[MAX_URL_LENGTH - 1] = '\0';
+        loaded++;
       }
     }
   }
 
   file.close();
-  if (numStations == 0) {
+  if (loaded > 0) {
+    numStations = loaded;
+  } else {
     loadDefaultStations();
   }
-    led.setPixelColor(0, led.Color(0, 0, 0));
-    led.show();
+  if (curStation >= numStations) curStation = 0;
+
+  led.setPixelColor(0, led.Color(0, 0, 0));
+  led.show();
 }
 
 void showStation() {
@@ -291,12 +337,13 @@ void showStation() {
   showVolume();
 }
 
-void audio_id3data(const char *info){M5Cardputer.Display.drawString(info, 0, 33);}
+void audio_id3data(const char *info){M5Cardputer.Display.drawString(toUtf8(info), 0, 33);}
 
 void Playfile() {
   led.setPixelColor(0, led.Color(255, 0, 0));
   led.show();
   audio.stopSong();
+  streamTitle = "";  // старое название трека к новой станции не относится
     
     String url = stations[curStation].url; // Armazena a URL para facilitar o acesso
     
@@ -304,12 +351,12 @@ void Playfile() {
         audio.connecttohost(stations[curStation].url);
     } 
     else if (url.indexOf("/mp3") != -1) {
-        M5Cardputer.Display.drawString("Play MP3 no SD /mp3    ", 0, 15);
+        M5Cardputer.Display.drawString("MP3 с SD-карты        ", 0, 15);
         delay(4000);
         audio.connecttoFS(SD,stations[curStation].url);
     } 
     else {
-        audio.connecttospeech("Trabalhe em quanto os outros dormem, e você ficará com sono durante o dia.", "pt");
+        M5Cardputer.Display.drawString("Неверный адрес        ", 0, 15);
     }
   showStation();
 }
@@ -407,7 +454,7 @@ void setup() {
   led.show();  // Inicializa apagado
 
   M5Cardputer.Display.setRotation(1);
-  M5Cardputer.Display.setFont(&fonts::FreeMonoOblique9pt7b);
+  M5Cardputer.Display.setFont(&fontRU);  // моноширинный 9x15 с кириллицей
  
   connectToWiFi();
   
@@ -429,6 +476,7 @@ void loop() {
   audio.loop();
   M5Cardputer.update();
   updateBatteryDisplay(5000);
+  updateStreamTitle();
 
   if (M5Cardputer.Keyboard.isChange() && (millis() - lastButtonPress > DEBOUNCE_DELAY)) {
       //M5Cardputer.Speaker.tone(6000, 10);
@@ -453,12 +501,11 @@ void loop() {
     }
     else if (M5Cardputer.Keyboard.isKeyPressed('o')) {
       M5Cardputer.Display.fillRect(0, 15, 240, 49, TFT_BLACK);  
-      M5Cardputer.Display.drawString("PlayFile", 0, 15);
+      M5Cardputer.Display.drawString("Перезапуск", 0, 15);
       Playfile();
     }
     else if (M5Cardputer.Keyboard.isKeyPressed('s')) {
-      audio.stopSong();
-      audio.connecttospeech("Trabalhe em quanto os outros dormem, e você ficará com sono durante o dia.", "pt");
+      audio.pauseResume();  //tecla 's' pausa/retoma o stream
     }
     else if (M5Cardputer.Keyboard.isKeyPressed('f')) {
       toggleFFT();  //tecla 'f' para ativar/desativar FFT
@@ -489,45 +536,43 @@ void loop() {
 
 void audio_showstation(const char *showstation) {
     if (showstation && *showstation) {
-        char limitedInfo[25];
-        strncpy(limitedInfo, showstation, 24);
-        limitedInfo[24] = '\0';
+        // 240px / 9px на символ = 26 символов в строке; режем по границе UTF-8
+        String name = utf8Truncate(toUtf8(showstation), 26);
         M5Cardputer.Display.fillRect(0, 15, 240, 15, TFT_BLACK);
-        M5Cardputer.Display.drawString(limitedInfo, 0, 15);
-        glass2Show(stations[curStation].name, limitedInfo);
+        M5Cardputer.Display.drawString(name, 0, 15);
+        glass2Show(stations[curStation].name, utf8Truncate(name, 21).c_str());
         fftSimON = true;
     }
 }
 
+// Название трека приходит из ICY-метаданных только в момент смены, поэтому
+// сама прокрутка крутится из loop(), а не отсюда.
+void drawStreamTitle() {
+  M5Cardputer.Display.fillRect(0, 33, 240, 15, TFT_BLACK);
+  M5Cardputer.Display.drawString(streamTitle, titleOffset, 33);
+  M5Cardputer.Display.fillRect(0, 50, 240, 1, TFT_RED);
+}
+
+void updateStreamTitle() {
+  if (streamTitle.isEmpty()) return;
+
+  int textWidth = M5Cardputer.Display.textWidth(streamTitle);
+  int screenWidth = M5Cardputer.Display.width();
+  if (textWidth <= screenWidth) return;  // влезает целиком - двигать нечего
+
+  if (millis() - lastTitleScroll < 60) return;
+  lastTitleScroll = millis();
+
+  titleOffset -= 2;
+  if (titleOffset < -textWidth) titleOffset = screenWidth;
+  drawStreamTitle();
+}
+
 void audio_showstreamtitle(const char *info) {
-  static int xOffset = 0;                  // Posição horizontal do texto
-  static unsigned long lastUpdate = 0;     // Controle de tempo
-  const int updateInterval = 100;          // Velocidade da rolagem (ms)
-
-  if (info && *info) { 
-    int textWidth = M5Cardputer.Display.textWidth(info);  // Largura do texto
-
-    // Se o texto for maior que a tela, aplicamos a rolagem
-    if (textWidth > 21) {
-      if (millis() - lastUpdate > updateInterval) {
-        lastUpdate = millis();
-        xOffset--;  // Move o texto para a esquerda
-        // Quando o texto sair totalmente, reinicia a posição
-        if (xOffset < -textWidth) {
-          xOffset = 21;
-        }
-      }
-    } else {
-      xOffset = 0;  // Mantém o texto fixo se for menor que 240 pixels
-    }
-
-    // Limpa a área do texto
-    M5Cardputer.Display.fillRect(0, 33, 240, 15, TFT_BLACK);
-    // Desenha o texto na posição atual
-    M5Cardputer.Display.drawString(info, xOffset, 33);
-    // Linha vermelha decorativa
-    M5Cardputer.Display.fillRect(0, 50, 240, 1, TFT_RED);
-  }
+  if (!info || !*info) return;
+  streamTitle = toUtf8(info);
+  titleOffset = 0;
+  drawStreamTitle();
 }
 
 // optional
