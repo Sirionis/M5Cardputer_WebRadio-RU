@@ -140,6 +140,7 @@ unsigned long lastTitleScroll = 0;
 void showVolume();
 void drawStreamTitle();
 void updateStreamTitle();
+void playUltra();
 void showStation();
 void Playfile();
 void loadDefaultStations();
@@ -437,6 +438,21 @@ void stationDown() {
   showVolume();
 }
 
+// Клавиша 'p' - быстрый переход на Радио ULTRA. Станцию ищем по URL: если
+// список подменили с SD и ULTRA в нём нет, откатываемся на первую.
+void playUltra() {
+  size_t target = 0;
+  for (size_t i = 0; i < numStations; i++) {
+    if (strstr(stations[i].url, "ultra-") != nullptr) {
+      target = i;
+      break;
+    }
+  }
+  curStation = target;
+  Playfile();
+  showVolume();
+}
+
 void setup() {
   auto cfg = M5.config();
   auto spk_cfg = M5Cardputer.Speaker.config();
@@ -494,10 +510,7 @@ void loop() {
       //Playfile();
     }
     else if (M5Cardputer.Keyboard.isKeyPressed('p')) {
-      M5Cardputer.Display.fillRect(0, 15, 240, 49, TFT_BLACK);  
-      M5Cardputer.Display.drawString("Los Santos Rock", 0, 15);
-      audio.stopSong();
-      audio.connecttoFS(SD,"/mp3/Los Santos Rock Radio.mp3");
+      playUltra();  //клавиша 'p' - быстрый переход на Радио ULTRA
     }
     else if (M5Cardputer.Keyboard.isKeyPressed('o')) {
       M5Cardputer.Display.fillRect(0, 15, 240, 49, TFT_BLACK);  

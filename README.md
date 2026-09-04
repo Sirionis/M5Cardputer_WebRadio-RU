@@ -1,74 +1,130 @@
+# M5Cardputer WebRadio — RU edition
 
-# M5Cardputer_WebRadio — RU edition
+Интернет-радио для [M5Cardputer](https://docs.m5stack.com/en/core/Cardputer):
+19 российских станций зашиты в прошивку, SD-карта не нужна, интерфейс и
+названия станций — на русском.
 
-Самостоятельная (standalone) прошивка для M5Cardputer: список российских
-интернет-станций зашит в бинарник, SD-карта **не нужна**.
+Форк [cyberwisk/M5Cardputer_WebRadio](https://github.com/cyberwisk/M5Cardputer_WebRadio)
+(автор оригинала — Aurélio Avanzi).
+
+<img width="3768" height="2169" alt="M5Cardputer WebRadio" src="https://github.com/user-attachments/assets/f7830b1f-385d-4ce9-9125-a81d26a4a661" />
+
+## Что изменено по сравнению с оригиналом
+
+* Список станций — российский, вместо бразильского.
+* Прошивка автономна: станции лежат в самом бинарнике, SD-карта опциональна.
+* Кириллица на экране — оригинал умел только ASCII.
+* Интерфейс переведён на русский.
+* Сборка в PlatformIO, воспроизводимая одной командой.
+* Починены четыре бага, см. [«Исправленные баги»](#исправленные-баги).
 
 ## Прошивка
 
-**Через лоадер (M5Launcher и подобные)** — `WebRadio_RU.bin`, 1.28 МБ,
-это чистый образ приложения. Кинуть на SD-карту и выбрать в меню лоадера.
+### Через лоадер (M5Launcher и подобные)
 
-**Через esptool напрямую** — образ приложения пишется по адресу `0x10000`
-(разделы и бутлоадер уже на устройстве, настройки Wi-Fi в NVS сохраняются):
+Взять `WebRadio_RU.bin` (1.3 МБ) — это чистый образ приложения. Скопировать на
+SD-карту и выбрать в меню лоадера.
+
+### Через esptool
+
+Образ приложения пишется по адресу `0x10000`. Бутлоадер и таблица разделов уже
+на устройстве, настройки Wi-Fi в NVS сохраняются:
 
 ```bash
 esptool.py --chip esp32s3 --port /dev/ttyACM0 --baud 1500000 write_flash 0x10000 WebRadio_RU.bin
 ```
 
-Если нужен полный образ на 4 МБ для записи с `0x0` (bootloader + таблица
-разделов + boot_app0 + приложение) — он собирается скриптом
-`./tools/make_release_bin.sh`. Учти, что такой образ обнуляет NVS, и Wi-Fi
-придётся вводить заново.
+Если нужен полный образ на 4 МБ для записи с нуля (bootloader + таблица
+разделов + boot_app0 + приложение), он собирается скриптом
+`./tools/make_release_bin.sh` и пишется с `0x0`. Такой образ обнуляет NVS —
+Wi-Fi придётся ввести заново.
 
-## Сборка из исходников
+## Первый запуск
 
-Сборка сделана в PlatformIO (`platformio.ini` в корне репозитория):
-espressif32 / arduino-esp32 2.0.17, board `m5stack-stamps3`, разметка `huge_app`
-(3 МБ под приложение), ESP32-audioI2S 3.0.12.
+При первом включении устройство просканирует эфир и покажет список сетей.
+`;` и `.` двигают выбор, `ENTER` подтверждает, дальше вводится пароль.
+Учётные данные сохраняются в NVS через
+[Preferences](https://github.com/espressif/arduino-esp32/tree/master/libraries/Preferences),
+так что дальше подключение идёт автоматически.
 
-```bash
-~/.platformio/penv/bin/pio run -e cardputer
-./tools/make_release_bin.sh
-```
+Чтобы стереть сохранённую сеть, зажмите BtnA (боковая кнопка) в момент
+подключения — память очистится и устройство перезагрузится.
 
-Первая команда собирает `.pio/build/cardputer/firmware.bin` — это и есть
-`WebRadio_RU.bin` для лоадера. Вторая склеивает полный образ на 4 МБ.
+![Настройка Wi-Fi](https://github.com/cyberwisk/M5Cardputer_WebRadio/assets/3136312/531dfc77-a9b6-4a27-82ec-f0d6eeed2621)
+
+## Клавиши
+
+| Клавиша | Действие |
+|---------|----------|
+| `/` | следующая станция |
+| `,` | предыдущая станция |
+| `;` | громкость + |
+| `.` | громкость − |
+| `m` | выключить / включить звук |
+| `s` | пауза / продолжить |
+| `p` | быстрый переход на Радио ULTRA |
+| `r` | переподключиться к текущему потоку (если станция зависла) |
+| `o` | перезапустить воспроизведение |
+| `f` | спектр (FFT) вкл / выкл |
+| BtnA | при подключении — стереть сохранённую сеть Wi-Fi |
 
 ## Станции
 
-Список зашит в `defaultStations[]` в `M5Cardputer_WebRadio/M5Cardputer_WebRadio.ino`
-и продублирован в `M5Cardputer_WebRadio/station_list.txt`. Все потоки — обычный
-HTTP (меньше нагрузка на ESP32-S3, чем HTTPS), MP3 128 kbps или AAC+ 96 kbps.
+Список зашит в `defaultStations[]` в
+[M5Cardputer_WebRadio.ino](M5Cardputer_WebRadio/M5Cardputer_WebRadio.ino) и
+продублирован в [station_list.txt](M5Cardputer_WebRadio/station_list.txt).
+Все потоки — обычный HTTP: это заметно экономнее по RAM и CPU на ESP32-S3, чем
+HTTPS. Формат — MP3 128 kbps либо AAC+ 96 kbps.
 
-| # | Станция | Поток |
-|---|---------|-------|
-| 1 | Радио ULTRA | `nashe1.hostingradio.ru/ultra-128.mp3` |
-| 2 | НАШЕ Радио | `nashe1.hostingradio.ru/nashe-128.mp3` |
-| 3 | НАШЕ Классик Рок | `nashe1.hostingradio.ru/nasheclassic.mp3` |
-| 4 | НАШЕ Панки | `nashe1.hostingradio.ru/nashepunks.mp3` |
-| 5 | ROCK FM | `nashe1.hostingradio.ru/rock-128.mp3` |
-| 6 | Радио ENERGY | `gpm.hostingradio.ru/gpm-energyfm495.aacp` |
-| 7 | Авторадио | `gpm.hostingradio.ru/gpm-avtoradio495.aacp` |
-| 8 | Европа Плюс | `ep128.hostingradio.ru:8030/ep128` |
-| 9 | Радио MAXIMUM | `maximum.hostingradio.ru/maximum96.aacp` |
-| 10 | Русское Радио | `rusradio.hostingradio.ru/rusradio96.aacp` |
-| 11 | DFM | `dfm.hostingradio.ru/dfm96.aacp` |
-| 12 | Радио RECORD | `radiorecord.hostingradio.ru/rr_main96.aacp` |
-| 13 | RECORD Русский Микс | `radiorecord.hostingradio.ru/rus96.aacp` |
-| 14 | Дорожное радио | `dorognoe.hostingradio.ru:8000/dorognoe` |
-| 15 | Радио JAZZ | `nashe1.hostingradio.ru/jazz-128.mp3` |
-| 16 | BEST FM | `nashe1.hostingradio.ru/best-128.mp3` |
-| 17 | Юмор FM | `gpm.hostingradio.ru/gpm-humorfm495.aacp` |
-| 18 | Comedy Radio | `gpm.hostingradio.ru/gpm-comedyradio495.aacp` |
-| 19 | Радио МАЯК | `icecast.vgtrk.cdnvideo.ru/mayakfm_mp3_128kbps` |
+| # | Станция | Поток | Формат |
+|---|---------|-------|--------|
+| 1 | Радио ULTRA | `nashe1.hostingradio.ru/ultra-128.mp3` | MP3 128 |
+| 2 | НАШЕ Радио | `nashe1.hostingradio.ru/nashe-128.mp3` | MP3 128 |
+| 3 | НАШЕ Классик Рок | `nashe1.hostingradio.ru/nasheclassic.mp3` | MP3 128 |
+| 4 | НАШЕ Панки | `nashe1.hostingradio.ru/nashepunks.mp3` | MP3 128 |
+| 5 | ROCK FM | `nashe1.hostingradio.ru/rock-128.mp3` | MP3 128 |
+| 6 | Радио ENERGY | `gpm.hostingradio.ru/gpm-energyfm495.aacp` | AAC+ |
+| 7 | Авторадио | `gpm.hostingradio.ru/gpm-avtoradio495.aacp` | AAC+ |
+| 8 | Европа Плюс | `ep128.hostingradio.ru:8030/ep128` | MP3 |
+| 9 | Радио MAXIMUM | `maximum.hostingradio.ru/maximum96.aacp` | AAC+ 96 |
+| 10 | Русское Радио | `rusradio.hostingradio.ru/rusradio96.aacp` | AAC+ 96 |
+| 11 | DFM | `dfm.hostingradio.ru/dfm96.aacp` | AAC+ 96 |
+| 12 | Радио RECORD | `radiorecord.hostingradio.ru/rr_main96.aacp` | AAC+ 96 |
+| 13 | RECORD Русский Микс | `radiorecord.hostingradio.ru/rus96.aacp` | AAC+ 96 |
+| 14 | Дорожное радио | `dorognoe.hostingradio.ru:8000/dorognoe` | MP3 |
+| 15 | Радио JAZZ | `nashe1.hostingradio.ru/jazz-128.mp3` | MP3 128 |
+| 16 | BEST FM | `nashe1.hostingradio.ru/best-128.mp3` | MP3 128 |
+| 17 | Юмор FM | `gpm.hostingradio.ru/gpm-humorfm495.aacp` | AAC+ |
+| 18 | Comedy Radio | `gpm.hostingradio.ru/gpm-comedyradio495.aacp` | AAC+ |
+| 19 | Радио МАЯК | `icecast.vgtrk.cdnvideo.ru/mayakfm_mp3_128kbps` | MP3 128 |
+
+Названия ROCK FM, DFM, BEST FM и Comedy Radio оставлены латиницей — так они
+пишутся сами.
+
+### Свой список станций
+
+Файл `/station_list.txt` в корне SD-карты полностью заменяет встроенный список.
+Формат — по одной станции на строку, `Название,URL`, до 24 строк, кодировка
+UTF-8:
+
+```
+Радио ULTRA,http://nashe1.hostingradio.ru/ultra-128.mp3
+Своя станция,http://example.org/stream
+```
+
+Название — до 39 байт (в UTF-8 кириллица занимает 2 байта на символ, то есть
+примерно 19 русских букв), URL — до 99 символов. В строку экрана влезает
+26 символов.
+
+Без карты прошивка просто работает на встроенном списке.
 
 ## Кириллица
 
-Встроенные шрифты M5GFX (`FreeMonoOblique9pt7b`, `Font0` и прочие) содержат
-только ASCII, поэтому русский текст раньше выводился мусором. В `ru_fonts.c`
-добавлены два компактных u8g2-шрифта Misc-Fixed (public domain, ASCII +
-кириллица), которые подключаются через `lgfx::U8g2font`:
+Встроенные шрифты M5GFX (`FreeMonoOblique9pt7b`, `Font0` и остальные) содержат
+только ASCII, поэтому русский текст в оригинале выводился мусором. В
+[ru_fonts.c](M5Cardputer_WebRadio/ru_fonts.c) добавлены два компактных
+u8g2-шрифта Misc-Fixed (public domain, ASCII + кириллица), подключённые через
+`lgfx::U8g2font`:
 
 * `u8g2_font_9x15_t_cyrillic` — основной экран 240×135, 26 символов в строке;
 * `u8g2_font_6x12_t_cyrillic` — Unit GLASS2 OLED 128×64, 21 символ в строке.
@@ -77,83 +133,69 @@ HTTP (меньше нагрузка на ESP32-S3, чем HTTPS), MP3 128 kbps �
 обычно берут ради кириллицы.
 
 ICY-метаданные российских станций приходят в UTF-8 (проверено на nashe1, gpm,
-radiorecord, rusradio), и M5GFX декодирует UTF-8 сам. На случай серверов,
-которые до сих пор отдают CP1251, в `ru_fonts.h` есть `toUtf8()`: строка
-проверяется на валидность UTF-8 и только при ошибке конвертируется из CP1251.
-Обрезка длинных строк идёт через `utf8Truncate()` — по границе символа, иначе
-`strncpy()` разрубает двухбайтный символ пополам.
+radiorecord, rusradio), а UTF-8 M5GFX декодирует сам. На случай серверов,
+которые до сих пор отдают CP1251, в
+[ru_fonts.h](M5Cardputer_WebRadio/ru_fonts.h) есть `toUtf8()`: строка сначала
+проверяется на валидность UTF-8 и конвертируется только при ошибке. Длинные
+строки режет `utf8Truncate()` — по границе символа, иначе `strncpy()` разрубает
+двухбайтный символ пополам и на экране появляется мусорный глиф.
 
-Название трека теперь действительно едет бегущей строкой: `audio_showstreamtitle()`
-вызывается библиотекой только в момент смены метаданных, поэтому прокрутка
-крутится из `loop()`.
+## Сборка из исходников
 
-Если положить `/station_list.txt` в корень SD-карты, он полностью заменит
-встроенный список (до 24 строк вида `Название,URL`). Без карты прошивка просто
-работает на встроенном списке — загрузка больше не тормозит на 4 секунды с
-сообщением об ошибке SD.
+Проект собирается в PlatformIO:
+espressif32 / arduino-esp32 2.0.17, плата `m5stack-stamps3`, разметка
+`huge_app` (3 МБ под приложение), [ESP32-audioI2S](https://github.com/schreibfaul1/ESP32-audioI2S) 3.0.12.
 
-## Интерфейс
+```bash
+pio run -e cardputer
+```
 
-На русский переведены экраны настройки Wi-Fi в `CardWifiSetup.h` (поиск сетей,
-выбор сети, ввод пароля, сообщения о подключении и очистке памяти) и служебные
-надписи плеера. Названия станций тоже кириллицей — там, где это не ломает бренд
-(`ROCK FM`, `DFM`, `BEST FM`, `Comedy Radio` оставлены как есть).
+Результат — `.pio/build/cardputer/firmware.bin`, это и есть `WebRadio_RU.bin`
+для лоадера. Полный образ на 4 МБ собирается отдельно:
 
-## Клавиши
+```bash
+./tools/make_release_bin.sh
+```
 
-| Клавиша | Действие |
-|---------|----------|
-| `/` `,` | следующая / предыдущая станция |
-| `;` `.` | громкость + / − |
-| `m` | mute |
-| `s` | пауза / продолжить |
-| `r` | переподключиться к текущему потоку |
-| `f` | спектр (FFT) вкл/выкл |
-| `o` | перезапуск воспроизведения |
-| `p` | MP3 с SD-карты (`/mp3/...`) |
+Прошить подключённое устройство напрямую:
 
----
+```bash
+pio run -e cardputer -t upload
+```
 
-# M5Cardputer_WebRadio
+Занято: около 1.36 МБ флеша из 3 МБ и 18% RAM.
 
-M5Cardputer_WebRadio baseado nas bibliotecas: 
+### Сборка в Arduino IDE
 
-M5Unified : https://github.com/m5stack/M5Unified 
+Скетч остаётся совместим с Arduino IDE. Понадобятся библиотеки M5Cardputer,
+M5Unified, M5GFX, ESP32-audioI2S и Adafruit NeoPixel; плата — M5Stack StampS3
+со следующими настройками:
 
-A lista de rádios fica em um arquivo texto(station_list.txt) na raiz do cartão SD
-Ex:
-Nome da Radio01,http://Link da Radio/stream01
-Nome da Radio02,http://Link da Radio/stream02
-- Tecla R reseta a conexão com o servidor se a radio travar ou não iniciar
-- Tecla M liga e desliga o mudo
-- Tecla F liga e desliga o FFT
-- Capacidade de executar rádios AAC ou MP3
-- Salva configurações de WIFI na memória
+<img width="858" height="912" alt="Настройки StampS3 в Arduino IDE" src="https://github.com/user-attachments/assets/e14d7af5-be04-4ffd-b0f8-c96559b7589f" />
 
-- Arquivo station_list.txt de exemplo
-https://github.com/cyberwisk/M5Cardputer_WebRadio/blob/main/M5Cardputer_WebRadio/station_list.txt
+## Исправленные баги
 
-Baseado nas bibliotecas:
-M5Unified : https://github.com/m5stack/M5Unified
-ESP32-audioI2S Versão 3.0.13 : https://github.com/schreibfaul1/ESP32-audioI2S
+* `SD.begin()` вызывался без аргументов, с дефолтными пинами SPI — карта не
+  находилась в принципе. Теперь используются реальные пины Cardputer
+  (SCK 40 / MISO 39 / MOSI 14 / CS 12).
+* При отсутствии карты загрузка вставала на `delay(4000)` с сообщением об
+  ошибке. Теперь SD опциональна и не задерживает старт.
+* Стартовая станция была жёстко задана индексом 3: если список с SD оказывался
+  короче, чтение уходило за границу массива.
+* Бегущая строка с названием трека не двигалась: `audio_showstreamtitle()`
+  вызывается библиотекой только в момент смены метаданных, а прокрутка была
+  написана в расчёте на постоянные вызовы. Прокрутка перенесена в `loop()`.
 
-Aurelio
+## Библиотеки
 
-<img width="3768" height="2169" alt="IMG_20260508_171146" src="https://github.com/user-attachments/assets/f7830b1f-385d-4ce9-9125-a81d26a4a661" />
+* [M5Unified](https://github.com/m5stack/M5Unified) и [M5GFX](https://github.com/m5stack/M5GFX)
+* [M5Cardputer](https://github.com/m5stack/M5Cardputer)
+* [ESP32-audioI2S](https://github.com/schreibfaul1/ESP32-audioI2S) 3.0.12
+* [Adafruit NeoPixel](https://github.com/adafruit/Adafruit_NeoPixel)
+* Шрифты из [u8g2](https://github.com/olikraus/u8g2) (Misc-Fixed, public domain)
 
+## Лицензия и авторство
 
-----
-Wifi:
-
-Com ajuda da biblioteca [Preferences.h](https://github.com/espressif/arduino-esp32/tree/master/libraries/Preferences) agora é possivel salvar as configurações de Wifi na 
-
-EEPROM do StamoS3
-
-Assim que ligar o dispositivo, ele vai pedir as configurações de SSID e Senha do WIFI e salvar 
-
-![image](https://github.com/cyberwisk/M5Cardputer_WebRadio/assets/3136312/531dfc77-a9b6-4a27-82ec-f0d6eeed2621)
-
----------------
-* Configurações necessárias do StampS3 na IDE do arduino:
-
-<img width="858" height="912" alt="image" src="https://github.com/user-attachments/assets/e14d7af5-be04-4ffd-b0f8-c96559b7589f" />
+Оригинальный проект — Aurélio Avanzi (Cyberwisk),
+https://github.com/cyberwisk/M5Cardputer_WebRadio.
+Поддержка Unit GLASS2 — [Swissola](https://github.com/Swissola).
