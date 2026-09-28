@@ -141,6 +141,7 @@ void showVolume();
 void drawStreamTitle();
 void updateStreamTitle();
 void playUltra();
+void enableAdvCodec();
 void showStation();
 void Playfile();
 void loadDefaultStations();
@@ -373,7 +374,8 @@ void volumeUp() {
 
 void volumeDown() {
   if (curVolume > 0) {
-    curVolume = std::max(static_cast<uint16_t>(curVolume - 10), static_cast<uint16_t>(0));
+    // без проверки 5 - 10 в uint16_t даёт 65531, и громкость залипает
+    curVolume = (curVolume > 10) ? curVolume - 10 : 0;
     audio.setVolume(map(curVolume, 0, 255, 0, 21));
     showVolume();
   }
@@ -453,6 +455,31 @@ void playUltra() {
   showVolume();
 }
 
+// Cardputer ADV выводит звук через кодек ES8311, и пока его не включить по
+// I2C, данные с I2S уходят в никуда. M5Unified делает это только внутри
+// M5.Speaker.begin(), но плеер играет через ESP32-audioI2S на I2S_NUM_0, а
+// Speaker занял бы те же пины 41/42/43 на I2S_NUM_1. Поэтому пишем в кодек
+// напрямую ту же последовательность, что M5Unified
+// (_speaker_enabled_cb_cardputer_adv). У обычного Cardputer кодека нет.
+void enableAdvCodec() {
+  if (M5.getBoard() != m5::board_t::board_M5CardputerADV) return;
+
+  static constexpr uint8_t ES8311_ADDR = 0x18;
+  static constexpr uint8_t regs[][2] = {
+    {0x00, 0x80},  // RESET: включить конечный автомат кодека
+    {0x01, 0xB5},  // CLOCK_MANAGER: MCLK берётся с BCLK
+    {0x02, 0x18},  // CLOCK_MANAGER: MULT_PRE = 3
+    {0x0D, 0x01},  // SYSTEM: включить аналоговую часть
+    {0x12, 0x00},  // SYSTEM: включить ЦАП
+    {0x13, 0x10},  // SYSTEM: включить выход на усилитель наушников
+    {0x32, 0xBF},  // DAC: громкость 0 дБ
+    {0x37, 0x08},  // DAC: эквалайзер в обход
+  };
+  for (auto& r : regs) {
+    M5.In_I2C.writeRegister8(ES8311_ADDR, r[0], r[1], 100000);
+  }
+}
+
 void setup() {
   auto cfg = M5.config();
   auto spk_cfg = M5Cardputer.Speaker.config();
@@ -463,6 +490,7 @@ void setup() {
   //M5Cardputer.Speaker.setVolume(255);
   
   M5Cardputer.begin(cfg, true);
+  enableAdvCodec();
   glass2Init();
 
   led.begin();

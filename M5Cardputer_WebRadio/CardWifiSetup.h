@@ -95,6 +95,9 @@ void displayWiFiInfo() {
     M5Cardputer.Display.drawString("IP: " + WiFi.localIP().toString(), 1, 33);
     int8_t rssi = WiFi.RSSI();
     M5Cardputer.Display.drawString("RSSI: " + String(rssi) + " dBm", 1, 48);
+    M5Cardputer.Display.drawString(
+        M5.getBoard() == m5::board_t::board_M5CardputerADV ? "Плата: Cardputer ADV"
+                                                            : "Плата: Cardputer", 1, 63);
     delay(2000);
     M5Cardputer.Display.fillRect(0, 0, 240, 135, BLACK);
 }
