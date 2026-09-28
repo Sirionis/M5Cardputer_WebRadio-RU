@@ -125,6 +125,7 @@ const PROGMEM RadioStation defaultStations[] = {
   {"Юмор FM",             "http://gpm.hostingradio.ru/gpm-humorfm495.aacp"},
   {"Comedy Radio",        "http://gpm.hostingradio.ru/gpm-comedyradio495.aacp"},
   {"Радио МАЯК",          "http://icecast.vgtrk.cdnvideo.ru/mayakfm_mp3_128kbps"},
+  {"Радио Чипльдук",      "http://www.4duk.ru/4duk/128m3u.m3u"},
 };
 RadioStation stations[MAX_STATIONS];
 size_t numStations = 0;

@@ -3,7 +3,7 @@
 [![build](https://github.com/Sirionis/M5Cardputer_WebRadio-RU/actions/workflows/build.yml/badge.svg)](https://github.com/Sirionis/M5Cardputer_WebRadio-RU/actions/workflows/build.yml)
 
 Интернет-радио для [M5Cardputer](https://docs.m5stack.com/en/core/Cardputer):
-19 российских станций зашиты в прошивку, SD-карта не нужна, интерфейс и
+20 российских станций зашиты в прошивку, SD-карта не нужна, интерфейс и
 названия станций — на русском.
 
 Форк [cyberwisk/M5Cardputer_WebRadio](https://github.com/cyberwisk/M5Cardputer_WebRadio)
@@ -111,6 +111,7 @@ HTTPS. Формат — MP3 128 kbps либо AAC+ 96 kbps.
 | 17 | Юмор FM | `gpm.hostingradio.ru/gpm-humorfm495.aacp` | AAC+ |
 | 18 | Comedy Radio | `gpm.hostingradio.ru/gpm-comedyradio495.aacp` | AAC+ |
 | 19 | Радио МАЯК | `icecast.vgtrk.cdnvideo.ru/mayakfm_mp3_128kbps` | MP3 128 |
+| 20 | Радио Чипльдук | `4duk.ru/4duk/128m3u.m3u` | m3u 128 |
 
 Названия ROCK FM, DFM, BEST FM и Comedy Radio оставлены латиницей — так они
 пишутся сами.
